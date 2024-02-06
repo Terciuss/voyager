@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use TCG\Voyager\Database\Schema\SchemaManager;
 use TCG\Voyager\Events\BreadDataAdded;
 use TCG\Voyager\Events\BreadDataDeleted;
 use TCG\Voyager\Events\BreadDataRestored;
@@ -45,7 +44,7 @@ class VoyagerBaseController extends Controller
 
         $getter = $dataType->server_side ? 'paginate' : 'get';
 
-        $search = (object) ['value' => $request->get('s'), 'key' => $request->get('key'), 'filter' => $request->get('filter')];
+        $search = (object)['value' => $request->get('s'), 'key' => $request->get('key'), 'filter' => $request->get('filter')];
 
         $searchNames = [];
         if ($dataType->server_side) {
@@ -63,9 +62,9 @@ class VoyagerBaseController extends Controller
         if (strlen($dataType->model_name) != 0) {
             $model = app($dataType->model_name);
 
-            $query = $model::select($dataType->name.'.*');
+            $query = $model::select($dataType->name . '.*');
 
-            if ($dataType->scope && $dataType->scope != '' && method_exists($model, 'scope'.ucfirst($dataType->scope))) {
+            if ($dataType->scope && $dataType->scope != '' && method_exists($model, 'scope' . ucfirst($dataType->scope))) {
                 $query->{$dataType->scope}();
             }
 
@@ -84,21 +83,18 @@ class VoyagerBaseController extends Controller
 
             if ($search->value != '' && $search->key && $search->filter) {
                 $search_filter = ($search->filter == 'equals') ? '=' : 'LIKE';
-                $search_value = ($search->filter == 'equals') ? $search->value : '%'.$search->value.'%';
+                $search_value = ($search->filter == 'equals') ? $search->value : '%' . $search->value . '%';
 
                 $searchField = $dataType->name . '.' . $search->key;
                 $rows = $dataType->rows->where('type', 'relationship');
+                $belongs = $rows->firstWhere('field', $search->key);
                 if ($row = $this->findSearchableRelationshipRow($rows, $search->key)) {
                     $query->whereIn(
                         $searchField,
                         $row->details->model::where($row->details->label, $search_filter, $search_value)->pluck('id')->toArray()
                     );
-                } else if ($rows->isEmpty()) {
-                    if ($dataType->browseRows->pluck('field')->contains($search->key)) {
-                        $query->where($searchField, $search_filter, $search_value);
-                    }
-                } else {
-                    $row = $rows->first();
+                } else if ($belongs) {
+                    $row = $belongs;
                     $belongsTable = $row->details->pivot_table;
                     $model = new $row->details->model;
                     $query->select([
@@ -112,6 +108,10 @@ class VoyagerBaseController extends Controller
                         'belongs.' . $row->details->pivot_related,
                         'related.' . $model->getKeyName()
                     )->where('related.' . $row->details->label, $search_filter, $search_value);
+                } else {
+                    if ($dataType->browseRows->pluck('field')->contains($search->key)) {
+                        $query->where($searchField, $search_filter, $search_value);
+                    }
                 }
             }
 
@@ -120,12 +120,12 @@ class VoyagerBaseController extends Controller
                 $querySortOrder = (!empty($sortOrder)) ? $sortOrder : 'desc';
                 if (!empty($row)) {
                     $query->select([
-                        $dataType->name.'.*',
-                        'joined.'.$row->details->label.' as '.$orderBy,
+                        $dataType->name . '.*',
+                        'joined.' . $row->details->label . ' as ' . $orderBy,
                     ])->leftJoin(
-                        $row->details->table.' as joined',
-                        $dataType->name.'.'.$row->details->column,
-                        'joined.'.$row->details->key
+                        $row->details->table . ' as joined',
+                        $dataType->name . '.' . $row->details->column,
+                        'joined.' . $row->details->key
                     );
                 }
 
@@ -246,7 +246,7 @@ class VoyagerBaseController extends Controller
             if ($model && in_array(SoftDeletes::class, class_uses_recursive($model))) {
                 $query = $query->withTrashed();
             }
-            if ($dataType->scope && $dataType->scope != '' && method_exists($model, 'scope'.ucfirst($dataType->scope))) {
+            if ($dataType->scope && $dataType->scope != '' && method_exists($model, 'scope' . ucfirst($dataType->scope))) {
                 $query = $query->{$dataType->scope}();
             }
             $dataTypeContent = call_user_func([$query, 'findOrFail'], $id);
@@ -308,7 +308,7 @@ class VoyagerBaseController extends Controller
             if ($model && in_array(SoftDeletes::class, class_uses_recursive($model))) {
                 $query = $query->withTrashed();
             }
-            if ($dataType->scope && $dataType->scope != '' && method_exists($model, 'scope'.ucfirst($dataType->scope))) {
+            if ($dataType->scope && $dataType->scope != '' && method_exists($model, 'scope' . ucfirst($dataType->scope))) {
                 $query = $query->{$dataType->scope}();
             }
             $dataTypeContent = call_user_func([$query, 'findOrFail'], $id);
@@ -354,7 +354,7 @@ class VoyagerBaseController extends Controller
 
         $model = app($dataType->model_name);
         $query = $model->query();
-        if ($dataType->scope && $dataType->scope != '' && method_exists($model, 'scope'.ucfirst($dataType->scope))) {
+        if ($dataType->scope && $dataType->scope != '' && method_exists($model, 'scope' . ucfirst($dataType->scope))) {
             $query = $query->{$dataType->scope}();
         }
         if ($model && in_array(SoftDeletes::class, class_uses_recursive($model))) {
@@ -390,7 +390,7 @@ class VoyagerBaseController extends Controller
         }
 
         return $redirect->with([
-            'message'    => __('voyager::generic.successfully_updated')." {$dataType->getTranslatedAttribute('display_name_singular')}",
+            'message' => __('voyager::generic.successfully_updated') . " {$dataType->getTranslatedAttribute('display_name_singular')}",
             'alert-type' => 'success',
         ]);
     }
@@ -418,8 +418,8 @@ class VoyagerBaseController extends Controller
         $this->authorize('add', app($dataType->model_name));
 
         $dataTypeContent = (strlen($dataType->model_name) != 0)
-                            ? new $dataType->model_name()
-                            : false;
+            ? new $dataType->model_name()
+            : false;
 
         foreach ($dataType->addRows as $key => $row) {
             $dataType->addRows[$key]['col_width'] = $row->details->width ?? 100;
@@ -473,7 +473,7 @@ class VoyagerBaseController extends Controller
             }
 
             return $redirect->with([
-                'message'    => __('voyager::generic.successfully_added_new')." {$dataType->getTranslatedAttribute('display_name_singular')}",
+                'message' => __('voyager::generic.successfully_added_new') . " {$dataType->getTranslatedAttribute('display_name_singular')}",
                 'alert-type' => 'success',
             ]);
         } else {
@@ -510,7 +510,7 @@ class VoyagerBaseController extends Controller
         }
 
         $affected = 0;
-        
+
         foreach ($ids as $id) {
             $data = call_user_func([$dataType->model_name, 'findOrFail'], $id);
 
@@ -535,11 +535,11 @@ class VoyagerBaseController extends Controller
 
         $data = $affected
             ? [
-                'message'    => __('voyager::generic.successfully_deleted')." {$displayName}",
+                'message' => __('voyager::generic.successfully_deleted') . " {$displayName}",
                 'alert-type' => 'success',
             ]
             : [
-                'message'    => __('voyager::generic.error_deleting')." {$displayName}",
+                'message' => __('voyager::generic.error_deleting') . " {$displayName}",
                 'alert-type' => 'error',
             ];
 
@@ -558,7 +558,7 @@ class VoyagerBaseController extends Controller
 
         // Get record
         $query = $model->withTrashed();
-        if ($dataType->scope && $dataType->scope != '' && method_exists($model, 'scope'.ucfirst($dataType->scope))) {
+        if ($dataType->scope && $dataType->scope != '' && method_exists($model, 'scope' . ucfirst($dataType->scope))) {
             $query = $query->{$dataType->scope}();
         }
         $data = $query->findOrFail($id);
@@ -568,11 +568,11 @@ class VoyagerBaseController extends Controller
         $res = $data->restore($id);
         $data = $res
             ? [
-                'message'    => __('voyager::generic.successfully_restored')." {$displayName}",
+                'message' => __('voyager::generic.successfully_restored') . " {$displayName}",
                 'alert-type' => 'success',
             ]
             : [
-                'message'    => __('voyager::generic.error_restoring')." {$displayName}",
+                'message' => __('voyager::generic.error_restoring') . " {$displayName}",
                 'alert-type' => 'error',
             ];
 
@@ -633,7 +633,7 @@ class VoyagerBaseController extends Controller
 
                 // Check if we're dealing with a nested array for the case of multiple files
                 if (is_array($fieldData[0])) {
-                    foreach ($fieldData as $index=>$file) {
+                    foreach ($fieldData as $index => $file) {
                         // file type has a different structure than images
                         if (!empty($file['original_name'])) {
                             if ($file['original_name'] == $filename) {
@@ -687,7 +687,7 @@ class VoyagerBaseController extends Controller
 
             return response()->json([
                 'data' => [
-                    'status'  => 200,
+                    'status' => 200,
                     'message' => __('voyager::media.file_removed'),
                 ],
             ]);
@@ -705,7 +705,7 @@ class VoyagerBaseController extends Controller
 
             return response()->json([
                 'data' => [
-                    'status'  => $code,
+                    'status' => $code,
                     'message' => $message,
                 ],
             ], $code);
@@ -785,13 +785,13 @@ class VoyagerBaseController extends Controller
                     if (isset($row->details->thumbnails)) {
                         foreach ($row->details->thumbnails as $thumbnail) {
                             $ext = explode('.', $image);
-                            $extension = '.'.$ext[count($ext) - 1];
+                            $extension = '.' . $ext[count($ext) - 1];
 
                             $path = str_replace($extension, '', $image);
 
                             $thumb_name = $thumbnail->name;
 
-                            $this->deleteFileIfExists($path.'-'.$thumb_name.$extension);
+                            $this->deleteFileIfExists($path . '-' . $thumb_name . $extension);
                         }
                     }
                 }
@@ -821,11 +821,11 @@ class VoyagerBaseController extends Controller
 
         if (empty($dataType->order_column) || empty($dataType->order_display_column)) {
             return redirect()
-            ->route("voyager.{$dataType->slug}.index")
-            ->with([
-                'message'    => __('voyager::bread.ordering_not_set'),
-                'alert-type' => 'error',
-            ]);
+                ->route("voyager.{$dataType->slug}.index")
+                ->with([
+                    'message' => __('voyager::bread.ordering_not_set'),
+                    'alert-type' => 'error',
+                ]);
         }
 
         $model = app($dataType->model_name);
@@ -915,7 +915,7 @@ class VoyagerBaseController extends Controller
 
         $this->authorize($method, $model);
 
-        $rows = $dataType->{$method.'Rows'};
+        $rows = $dataType->{$method . 'Rows'};
         foreach ($rows as $key => $row) {
             if ($row->field === $request->input('type')) {
                 $options = $row->details;
@@ -925,7 +925,7 @@ class VoyagerBaseController extends Controller
                 $additional_attributes = $model->additional_attributes ?? [];
 
                 // Apply local scope if it is defined in the relationship-options
-                if (isset($options->scope) && $options->scope != '' && method_exists($model, 'scope'.ucfirst($options->scope))) {
+                if (isset($options->scope) && $options->scope != '' && method_exists($model, 'scope' . ucfirst($options->scope))) {
                     $model = $model->{$options->scope}();
                 }
 
@@ -940,9 +940,9 @@ class VoyagerBaseController extends Controller
                         $total_count = $relationshipOptions->count();
                         $relationshipOptions = $relationshipOptions->forPage($page, $on_page);
                     } else {
-                        $total_count = $model->where($options->label, 'LIKE', '%'.$search.'%')->count();
+                        $total_count = $model->where($options->label, 'LIKE', '%' . $search . '%')->count();
                         $relationshipOptions = $model->take($on_page)->skip($skip)
-                            ->where($options->label, 'LIKE', '%'.$search.'%')
+                            ->where($options->label, 'LIKE', '%' . $search . '%')
                             ->get();
                     }
                 } else {
@@ -954,7 +954,7 @@ class VoyagerBaseController extends Controller
 
                 if (!$row->required && !$search && $page == 1) {
                     $results[] = [
-                        'id'   => '',
+                        'id' => '',
                         'text' => __('voyager::generic.none'),
                     ];
                 }
@@ -970,13 +970,13 @@ class VoyagerBaseController extends Controller
 
                 foreach ($relationshipOptions as $relationshipOption) {
                     $results[] = [
-                        'id'   => $relationshipOption->{$options->key},
+                        'id' => $relationshipOption->{$options->key},
                         'text' => $relationshipOption->{$options->label},
                     ];
                 }
 
                 return response()->json([
-                    'results'    => $results,
+                    'results' => $results,
                     'pagination' => [
                         'more' => ($total_count > ($skip + $on_page)),
                     ],
@@ -1014,8 +1014,8 @@ class VoyagerBaseController extends Controller
 
             return !$this->relationIsUsingAccessorAsLabel($item->details);
         })
-        ->pluck('field')
-        ->toArray();
+            ->pluck('field')
+            ->toArray();
     }
 
     protected function relationIsUsingAccessorAsLabel($details)
