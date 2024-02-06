@@ -86,16 +86,32 @@ class VoyagerBaseController extends Controller
                 $search_filter = ($search->filter == 'equals') ? '=' : 'LIKE';
                 $search_value = ($search->filter == 'equals') ? $search->value : '%'.$search->value.'%';
 
-                $searchField = $dataType->name.'.'.$search->key;
-                if ($row = $this->findSearchableRelationshipRow($dataType->rows->where('type', 'relationship'), $search->key)) {
+                $searchField = $dataType->name . '.' . $search->key;
+                $rows = $dataType->rows->where('type', 'relationship');
+                if ($row = $this->findSearchableRelationshipRow($rows, $search->key)) {
                     $query->whereIn(
                         $searchField,
                         $row->details->model::where($row->details->label, $search_filter, $search_value)->pluck('id')->toArray()
                     );
-                } else {
+                } else if ($rows->isEmpty()) {
                     if ($dataType->browseRows->pluck('field')->contains($search->key)) {
                         $query->where($searchField, $search_filter, $search_value);
                     }
+                } else {
+                    $row = $rows->first();
+                    $belongsTable = $row->details->pivot_table;
+                    $model = new $row->details->model;
+                    $query->select([
+                        $dataType->name . '.*'
+                    ])->leftJoin(
+                        $belongsTable . ' as belongs',
+                        $dataType->name . '.' . $row->details->column,
+                        'belongs.' . $row->details->pivot_foreign
+                    )->leftJoin(
+                        $row->details->table . ' as related',
+                        'belongs.' . $row->details->pivot_related,
+                        'related.' . $model->getKeyName()
+                    )->where('related.' . $row->details->label, $search_filter, $search_value);
                 }
             }
 
